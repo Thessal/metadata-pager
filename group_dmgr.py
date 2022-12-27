@@ -2,13 +2,16 @@ import json
 import pandas as pd
 import urllib
 import os
+from util import calc_self_hash
 from config import CFG
-
+import numpy as np
 
 class DmgrTagGroup:
-    def __init__(self, srcdir=CFG["group"]["src"], cachedir=CFG["group"]["dst"], max_group_level=5,
-                 include_pools=False, include_artists=False
+    def __init__(self, srcdir=CFG["group"]["src"], cachedir=CFG["group"]["dst"], tag_src=CFG["tag"]["src"],
+                 max_group_level=5, group_min_freq=10000,
+                 include_pools=False, include_artists=False,
                  ):
+        self.hash_ = calc_self_hash(str(__file__), locals(), self.__init__.__code__.co_varnames)
         self.max_group_level = max_group_level
         self.include = {
             "tags": True,
@@ -27,13 +30,76 @@ class DmgrTagGroup:
             ),
             "artists": (
                 "https://danbooru.donmai.us/artists/show_or_new?name=",
-                lambda name, tag_url, pattern: "artist:" + urllib.parse.unquote(tag_url).replace(pattern, "")
+                lambda name, tag_url, pattern: urllib.parse.unquote(tag_url).replace(pattern, "") + "_(artist)"
             ),
         }
-        cache_file = f"{cachedir}/tag_group.pkl"
+        self.load(cachedir, srcdir, tag_src, group_min_freq)
+
+    def load(self, cachedir, srcdir, tag_src, group_min_freq):
+        cache_file = f"{cachedir}/tag_group_{self.hash_}.pkl"
         if not os.path.isfile(cache_file):
             self.build(srcdir).to_pickle(cache_file)
         self.tag_group = pd.read_pickle(cache_file)
+
+        cache_file_count = f"{cachedir}/tag_group_count_{self.hash_}.pkl"
+        cache_file_map = f"{cachedir}/tag_group_map_{self.hash_}.pkl"
+        if not (os.path.isfile(cache_file_count) and os.path.isfile(cache_file_map)):
+            df_tag_group_count, tag_group_map = self.build_index(tag_src, group_min_freq)
+            df_tag_group_count.to_pickle(cache_file_count)
+            tag_group_map.to_pickle(cache_file_map)
+        self.tag_group_count, self.tag_group_map = pd.read_pickle(cache_file_count), pd.read_pickle(cache_file_map)
+
+    def build_index(self, tag_src, min_freq=10000):
+        with open(tag_src, "r") as f:
+            tags_cnt = pd.DataFrame([
+                json.loads(line) for line in f.readlines()
+            ]).set_index('name')["post_count"].astype(int).to_dict()
+
+        # Merge tag and group table
+        tag_group_count = {k: 0 for k in list(set([y for x in self.tag_group.set_index("tag").values for y in x]))}
+        map_fail, map_success = [], []
+        for k, v in self.tag_group.set_index("tag").iterrows():
+            group_tags = [x for x in v.tolist() if (x != "")]
+            count = tags_cnt[k] if k in tags_cnt else 0
+            if k not in tags_cnt:
+                map_fail.append(k)
+            else:
+                map_success.append(k)
+            for group_tag in group_tags:
+                tag_group_count[group_tag] += count
+        print(f"group mapping : {len(map_success)} success, {len(map_fail)} failure")
+
+        # Filter groups by frequency
+        df_tag_group_count = pd.Series(tag_group_count).sort_values(ascending=False)
+        df_tag_group_count = df_tag_group_count[df_tag_group_count > min_freq]
+        df_tag_group_count = pd.Series({
+            k: x for k, x in df_tag_group_count.iteritems() if
+            not any(map(lambda x: k in x, df_tag_group_count[k:].iloc[1:].keys()))
+        })
+
+        tag_group_ = self.tag_group.set_index("tag")
+        tag_group_map = pd.Series({
+            k: [
+                df_tag_group_count.index.get_loc(x) for x in tag_group_.loc[k].values.ravel() if
+                (x in df_tag_group_count)
+            ]
+            for k in map_success
+        })
+
+        return df_tag_group_count, tag_group_map
+
+    def encode(self, tag):
+        """Tag -> group -> code"""
+        idxs = [y for x in tag if (x in self.tag_group_map[x]) for y in self.tag_group_map[x]]
+        output = np.zeros(len(self.tag_group_map.index))
+        output[idxs] = 1
+        return output
+
+    def decode(self, vec):
+        """Code -> group"""
+        idxs = [i for i,x in vec if x>0]
+        output = [self.tag_group_map.index[idx] for idx in idxs]
+        return output
 
     def traverse(self, info_lst, levels=[]):
         """DFS Tag group"""
@@ -75,7 +141,7 @@ class DmgrTagGroup:
         return infos
 
     def build(self, srcdir):
-        source_file = f"{srcdir}/e.json"  # https://github.com/wangyi041228/danbooru_tags
+        source_file = f"{srcdir}"
         with open(source_file, "rt") as f:
             tag_groups = json.load(f)
 
@@ -83,7 +149,7 @@ class DmgrTagGroup:
         df_tag = pd.DataFrame(tag_enum, dtype=str)
 
         # Caculate unique group path
-        unique_tag = (df_tag + "/").cumsum(axis=1)[df_tag != ""].fillna("").applymap(lambda x: x[:-1])
+        unique_tag = (df_tag + "/").cumsum(axis=1)[df_tag != ""].fillna("").applymap(lambda x: x[:-1]).iloc[:, :-1]
         unique_tag["tag"] = df_tag[df_tag != ""].apply(lambda x: x.dropna().tolist()[-1], axis=1)
 
         return unique_tag
