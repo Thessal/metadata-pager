@@ -88,19 +88,6 @@ class DmgrTagGroup:
 
         return df_tag_group_count, tag_group_map
 
-    def encode(self, tag):
-        """Tag -> group -> code"""
-        idxs = [y for x in tag if (x in self.tag_group_map[x]) for y in self.tag_group_map[x]]
-        output = np.zeros(len(self.tag_group_map.index))
-        output[idxs] = 1
-        return output
-
-    def decode(self, vec):
-        """Code -> group"""
-        idxs = [i for i,x in vec if x>0]
-        output = [self.tag_group_map.index[idx] for idx in idxs]
-        return output
-
     def traverse(self, info_lst, levels=[]):
         """DFS Tag group"""
         infos = []
@@ -153,3 +140,20 @@ class DmgrTagGroup:
         unique_tag["tag"] = df_tag[df_tag != ""].apply(lambda x: x.dropna().tolist()[-1], axis=1)
 
         return unique_tag
+
+    def index(self, tags):
+        idxs = [y for x in tags if (x in self.tag_group_map[x]) for y in self.tag_group_map[x]]
+        return list(set(idxs))
+
+    def get(self, idxs):
+        tags = [self.tag_group_map.index[idx] for idx in idxs]
+        return tags
+
+    def encode(self, tags):
+        one_hot = np.zeros(len(self.tag_group_map.index))
+        one_hot[self.index(tags)] = 1
+        return one_hot
+
+    def decode(self, one_hot):
+        tags = self.get([i for i,x in one_hot if x>0])
+        return tags
