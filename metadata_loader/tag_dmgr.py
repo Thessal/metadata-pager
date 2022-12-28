@@ -33,7 +33,7 @@ class DmgrTags:
         return pd.Series(df.index.values, index=df.values)
 
     def index(self, tags):
-        idxs = [self.tags_index[x] for x in tags if (x in self.tags_index)]
+        idxs = [self.tags_index.index.get_loc(x) for x in tags if (x in self.tags_index)]
         return list(set(idxs))
 
     def get(self, idxs):
