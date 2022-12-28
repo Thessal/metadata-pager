@@ -20,8 +20,11 @@ def page(args):
 
 class TagLoader:
     def __init__(self, dmgr_group, dmgr_tag, srcdir=CFG["tag"]["src_all"], cachedir=CFG["tag"]["dst"], debug=False):
+        locals_ = locals()
         group_n, tag_n = len(dmgr_group), len(dmgr_tag)
-        hash_ = "" if debug else calc_self_hash(str(__file__), locals(), self.__init__.__code__.co_varnames)
+        locals_["group_n"], locals_["tag_n"] = group_n, tag_n
+        varnames = ["srcdir", "cachedir", "debug", "group_n", "tag_n"]
+        hash_ = "" if debug else calc_self_hash(str(__file__), locals_, varnames)
         self.dmgr_tag = dmgr_tag
         self.dmgr_group = dmgr_group
         self.srcdir = srcdir
@@ -76,7 +79,7 @@ class TagLoader:
         blocks = list(map(lambda x: str(x).zfill(3), range(1000)))
         args_all = zip(itertools.repeat(self.cachedir), [self.cachedir_block(b) for b in blocks], blocks)
         with Pool(5) as p:
-            print(p.map(page, args_all))
+            p.map(page, args_all)
 
     def load(self):
 
