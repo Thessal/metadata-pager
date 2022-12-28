@@ -29,14 +29,15 @@ class DmgrTags:
         df_tags_0["post_count"] = df_tags_0["post_count"].astype(int)
         df_tags_0 = df_tags_0.sort_values("post_count", ascending=False)
         df_tags_0_TOP = df_tags_0[df_tags_0["post_count"] > min_count]
-        return df_tags_0_TOP['name']
+        df = df_tags_0_TOP['name'].reset_index(drop=True)
+        return pd.Series(df.index.values, index=df.values)
 
     def index(self, tags):
-        idxs = [self.tags_index.index.get_loc(x) for x in tags if (x in self.tags_index)]
+        idxs = [self.tags_index[x] for x in tags if (x in self.tags_index)]
         return list(set(idxs))
 
     def get(self, idxs):
-        tags = [self.tags_index.index[idx] for idx in idxs]
+        tags = self.tags_index.index[idxs].to_list()
         return tags
 
     def encode(self, tags):
