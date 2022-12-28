@@ -4,8 +4,8 @@ import os
 import requests
 import io
 import re
-from config import CFG
-from util import calc_self_hash
+from .config import CFG
+from .util import calc_self_hash
 
 
 class TagLoader:
@@ -43,12 +43,13 @@ class TagLoader:
                 data = b""
                 for x in raw_data:
                     if (int(x["score"]) > 5) and (x['file_ext'].lower() in ['jpg', 'jpeg', 'bmp', 'png', 'gif']):
+                        tag_names = [y['name'] for y in x['tags']]
                         tag_processed = {
                             "id": x['id'],
                             "pools": x["pools"],
                             "file_ext": x['file_ext'],
-                            "tags_": self.dmgr_tag.index(x['tags']),
-                            "groups_": self.dmgr_group.index(x['tags']),
+                            "tags_": self.dmgr_tag.index(tag_names),
+                            "groups_": self.dmgr_group.index(tag_names),
                         }
                         data += lzc.compress((json.dumps(tag_processed) + '\n').encode(encoding='utf-8'))
                 data += lzc.flush()

@@ -2,8 +2,8 @@ import json
 import pandas as pd
 import urllib
 import os
-from util import calc_self_hash
-from config import CFG
+from .util import calc_self_hash
+from .config import CFG
 import numpy as np
 
 class DmgrTagGroup:
@@ -81,12 +81,13 @@ class DmgrTagGroup:
         tag_group_map = pd.Series({
             k: [
                 df_tag_group_count.index.get_loc(x) for x in tag_group_.loc[k].values.ravel() if
-                (x in df_tag_group_count)
+                (x in df_tag_group_count)  # Use frequent group only
             ]
             for k in map_success
         })
+        tag_group_map = tag_group_map[tag_group_map.apply(len) > 1]  # Remove empty group mapping
 
-        return df_tag_group_count, tag_group_map
+        return df_tag_group_count, tag_group_map  # Group List, Tag-GroupIndex table
 
     def traverse(self, info_lst, levels=[]):
         """DFS Tag group"""
@@ -142,12 +143,12 @@ class DmgrTagGroup:
         return unique_tag
 
     def index(self, tags):
-        idxs = [y for x in tags if (x in self.tag_group_map[x]) for y in self.tag_group_map[x]]
+        idxs = [y for x in tags if (x in self.tag_group_map) for y in self.tag_group_map[x]]
         return list(set(idxs))
 
     def get(self, idxs):
-        tags = [self.tag_group_map.index[idx] for idx in idxs]
-        return tags
+        groups = [self.tag_group_count.index[idx] for idx in idxs]
+        return groups
 
     def encode(self, tags):
         one_hot = np.zeros(len(self.tag_group_map.index))
@@ -155,5 +156,16 @@ class DmgrTagGroup:
         return one_hot
 
     def decode(self, one_hot):
-        tags = self.get([i for i,x in one_hot if x>0])
-        return tags
+        # NOTE: Not 1-to-1
+        groups = self.get([i for i, x in enumerate(one_hot) if x > 0])
+        return groups
+
+    def __len__(self):
+        return len(self.tag_group_map.index)
+
+    def __getitem(self, x):
+        assert type(x) == 'list'
+        if type(x[0]) == 'str':
+            return self.index(x)
+        elif type(x[0]) == 'int':
+            return self.get(x)

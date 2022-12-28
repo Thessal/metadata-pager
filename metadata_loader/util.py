@@ -10,6 +10,7 @@ def calc_self_hash(_file, _locals, _varnames):
     assert (all((type(x) in _mutable_types) for x in _vars.keys()))
     with open(_file, 'rb') as f:
         hash_ = hashlib.md5(f.read()).digest()
-    hash_ += hashlib.md5(str().encode()).digest()
+    hash_ += hashlib.md5(str(_vars).encode()).digest()
     hash_ = hashlib.md5(hash_).hexdigest()
+    print(hash_)
     return hash_

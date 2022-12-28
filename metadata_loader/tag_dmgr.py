@@ -4,17 +4,17 @@ import numpy as np
 import lzma, tarfile
 import os
 import re
-from config import CFG
-from util import calc_self_hash
+from .config import CFG
+from .util import calc_self_hash
 
 class DmgrTags:
     def __init__(self, srcdir=CFG["tag"]["src"], cachedir=CFG["tag"]["dst"], count_thres=1000):
-        hash_ = calc_self_hash(str(__file__), locals(), self.__init__.__code__.co_varnames)
+        self.hash_ = calc_self_hash(str(__file__), locals(), self.__init__.__code__.co_varnames)
 
         self.srcdir = srcdir
         self.cachedir = cachedir
 
-        cache_file = f"{cachedir}/tag_index{self.hash_}.pkl"
+        cache_file = f"{cachedir}/tag_index_{self.hash_}.pkl"
         if not os.path.isfile(cache_file):
             self.load_tags_index(min_count=count_thres).to_pickle(cache_file)
         self.tags_index = pd.read_pickle(cache_file)
@@ -24,7 +24,7 @@ class DmgrTags:
             tags_d = [json.loads(line) for line in f.readlines()]
 
         df_tags = pd.DataFrame(tags_d)
-        df_tags_0 = df_tags.query("category=='0'")
+        df_tags_0 = df_tags.query("category=='0'").copy()
         df_tags_0["post_count"] = df_tags_0["post_count"].astype(int)
         df_tags_0 = df_tags_0.sort_values("post_count", ascending=False)
         df_tags_0_TOP = df_tags_0[df_tags_0["post_count"] > min_count]
@@ -44,7 +44,7 @@ class DmgrTags:
         return one_hot
 
     def decode(self, one_hot):
-        tags = self.get([i for i,x in enumerate(one_hot) if x>0])
+        tags = self.get([i for i, x in enumerate(one_hot) if x > 0])
         return tags
 
     def __len__(self):
