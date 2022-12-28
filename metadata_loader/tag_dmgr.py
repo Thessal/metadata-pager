@@ -7,6 +7,7 @@ import re
 from .config import CFG
 from .util import calc_self_hash
 
+
 class DmgrTags:
     def __init__(self, srcdir=CFG["tag"]["src"], cachedir=CFG["tag"]["dst"], count_thres=1000):
         self.hash_ = calc_self_hash(str(__file__), locals(), self.__init__.__code__.co_varnames)

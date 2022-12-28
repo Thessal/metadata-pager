@@ -6,6 +6,7 @@ from .util import calc_self_hash
 from .config import CFG
 import numpy as np
 
+
 class DmgrTagGroup:
     def __init__(self, srcdir=CFG["group"]["src"], cachedir=CFG["group"]["dst"], tag_src=CFG["tag"]["src"],
                  max_group_level=5, group_min_freq=10000,

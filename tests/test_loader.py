@@ -10,7 +10,9 @@ class TestTag:
         self.tag_loader = TagLoader(
             self.groups_info, self.tags_info,
             srcdir=CFG["test_loader"]["src"],
-            cachedir=CFG["test_loader"]["dst"])
+            cachedir=CFG["test_loader"]["dst"],
+            debug=True,
+        )
 
     def test_init(self):
         print(self.dmgr)

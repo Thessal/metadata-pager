@@ -8,14 +8,25 @@ from .config import CFG
 from .util import calc_self_hash
 
 
+def page(args):
+    cachedir, cachedir_block, block = args
+    command = (
+            'xzcat ' + cachedir + ' | grep -E "\\"id\\": \\"[0-9]*' + block + '\\"" | xz > ' +
+            cachedir_block
+    )
+    print(command)
+    os.system(command)
+
+
 class TagLoader:
-    def __init__(self, dmgr_group, dmgr_tag, srcdir=CFG["tag"]["src_all"], cachedir=CFG["tag"]["dst"]):
+    def __init__(self, dmgr_group, dmgr_tag, srcdir=CFG["tag"]["src_all"], cachedir=CFG["tag"]["dst"], debug=False):
         group_n, tag_n = len(dmgr_group), len(dmgr_tag)
-        hash_ = calc_self_hash(str(__file__), locals(), self.__init__.__code__.co_varnames)
+        hash_ = "" if debug else calc_self_hash(str(__file__), locals(), self.__init__.__code__.co_varnames)
         self.dmgr_tag = dmgr_tag
         self.dmgr_group = dmgr_group
         self.srcdir = srcdir
         self.cachedir = cachedir + f"/metadata_processed_{hash_}_{group_n}_{tag_n}.json.xz"
+        self.cachedir_block_dir = cachedir + f"./metadata_processed_{hash_}_{group_n}_{tag_n}/"
         self.cachedir_block = lambda idx: cachedir + f"./metadata_processed_{hash_}_{group_n}_{tag_n}/{idx}.json.xz"
         raw_data = self.load_raw()
         self.process(raw_data)
@@ -54,8 +65,21 @@ class TagLoader:
                         data += lzc.compress((json.dumps(tag_processed) + '\n').encode(encoding='utf-8'))
                 data += lzc.flush()
                 f.write(data)
+            self.page_all()
+
+    def page_all(self):
+        from multiprocessing import Pool
+        import os
+        import itertools
+        os.system("mkdir " + self.cachedir_block_dir)
+
+        blocks = list(map(lambda x: str(x).zfill(3), range(1000)))
+        args_all = zip(itertools.repeat(self.cachedir), [self.cachedir_block(b) for b in blocks], blocks)
+        with Pool(5) as p:
+            print(p.map(page, args_all))
 
     def load(self):
+
         def metadata_gen(blocks):
             if blocks is None:
                 blocks = []
